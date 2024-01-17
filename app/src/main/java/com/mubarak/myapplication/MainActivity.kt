@@ -22,11 +22,13 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.mubarak.imagetovideo.EncodeListener
 import com.mubarak.imagetovideo.ImageToVideoConverter
+import com.mubarak.myapplication.databinding.ActivityMainBinding
 import java.io.File
 import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var binding: ActivityMainBinding
     private val imagePaths: MutableList<String> = mutableListOf()
 
     // Register the result launcher for picking multiple images
@@ -40,11 +42,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
-        val createVideoButton: Button = findViewById(R.id.createVideoButton)
+        binding = ActivityMainBinding.inflate(layoutInflater)
 
-        createVideoButton.setOnClickListener {
+        setContentView(binding.root)
+        binding.progressBar.max = 100
+        binding.createVideoButton.setOnClickListener {
             // Check and request storage permission before creating the video
             if (checkWriteStoragePermission()) {
                 pickImages()
@@ -70,10 +73,8 @@ class MainActivity : AppCompatActivity() {
         data.data?.let { uri ->
             val decodedUriString = Uri.decode(uri.toString())
             val decodedUri = Uri.parse(decodedUriString)
-            Log.e(TAG, "handleImageSelectionResult: decodedUri $decodedUri")
 
             getImagePathFromUri(this, decodedUri)?.let { imagePath ->
-                Log.e(TAG, "handleImageSelectionResult: imagePath uri : $imagePath")
                 selectedImages.add(imagePath)
             }
         }
@@ -86,10 +87,8 @@ class MainActivity : AppCompatActivity() {
 
                 val decodedUriString = Uri.decode(uri.toString())
                 val decodedUri = Uri.parse(decodedUriString)
-                Log.e(TAG, "handleImageSelectionResult: decodedUri $decodedUri")
 
                 getImagePathFromUri(this, decodedUri)?.let { imagePath ->
-                    Log.e(TAG, "handleImageSelectionResult: imagePath uri clipData : $imagePath")
                     selectedImages.add(imagePath)
                 }
             }
@@ -102,7 +101,6 @@ class MainActivity : AppCompatActivity() {
             createVideo()
         } else {
             Log.e(TAG, "handleImageSelectionResult: selectedImages $selectedImages")
-
         }
     }
 
@@ -123,39 +121,11 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    // Create a video file and notify MediaStore about the new file
-    private fun createVideoFiles(): String {
-        val outputDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES)
-        val outputPath = File(outputDir, "output_${System.currentTimeMillis()}.mp4")
-
-        if (!outputDir.exists()) {
-            outputDir.mkdirs()
-        }
-
-        // Notify MediaStore about the new file
-        MediaScannerConnection.scanFile(this, arrayOf(outputPath.absolutePath), null) { path, uri ->
-            Log.d(TAG, "MediaScanner scanned path: $path")
-            Log.d(TAG, "MediaScanner scanned uri: $uri")
-        }
-
-        return outputPath.absolutePath
-    }
-
-    // Check if external storage is writable
-    private fun isExternalStorageWritable(): Boolean {
-        val state = Environment.getExternalStorageState()
-        return Environment.MEDIA_MOUNTED == state
-    }
-
     // Create a video using ImageToVideoConverter
     private fun createVideo() {
         if (isExternalStorageWritable()) {
             // Get the output video path and example image paths
             val outputVideoPath = createVideoFiles()
-
-            /* Log.e(TAG, "createVideo: imagePaths $imagePaths")
-             val imageUri = Uri.parse("content://media/external/images/media/19")
-             val imagePath = getImagePathFromUri(this, imageUri)*/
 
             // Log the image path for debugging
             Log.e(TAG, "createVideo: imagePath :: $imagePaths")
@@ -170,11 +140,14 @@ class MainActivity : AppCompatActivity() {
                         Log.d("progress", "progress = ${(progress * 100).toInt()}")
                         runOnUiThread {
                             // Toast.makeText(this@MainActivity, "${(progress * 100).toInt()}", Toast.LENGTH_SHORT).show()
+                            binding.progressBar.progress = (progress * 100).toInt()
+
                         }
                     }
 
                     override fun onCompleted() {
                         Log.e(TAG, "onCompleted: Video created")
+                        binding.progressBar.progress = 100
                     }
 
                     override fun onFailed(exception: Exception) {
@@ -182,20 +155,10 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             )
-            imageToVideo?.start()
+            imageToVideo.start()
         } else {
             Log.e(TAG, "createVideo: Failed to create video due to external storage not writable")
         }
-    }
-
-    fun convertFloatToIntInRange(value: Float): Int {
-        // Ensure the value is within the range 0.0 to 100.0
-        val clampedValue = value.coerceIn(0.0f, 100.0f)
-
-        // Convert the clamped value to an integer
-        val intValue = (clampedValue * 100).toInt()
-
-        return intValue
     }
 
     // Get the file path from a content URI
@@ -245,19 +208,28 @@ class MainActivity : AppCompatActivity() {
         return imagePath
     }
 
-    // Check if the authority of the URI is for external storage documents
-    private fun isExternalStorageDocument(uri: Uri): Boolean {
-        return "com.android.externalstorage.documents" == uri.authority
+    // Create a video file and notify MediaStore about the new file
+    private fun createVideoFiles(): String {
+        val outputDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES)
+        val outputPath = File(outputDir, "output_${System.currentTimeMillis()}.mp4")
+
+        if (!outputDir.exists()) {
+            outputDir.mkdirs()
+        }
+
+        // Notify MediaStore about the new file
+        MediaScannerConnection.scanFile(this, arrayOf(outputPath.absolutePath), null) { path, uri ->
+            Log.d(TAG, "MediaScanner scanned path: $path")
+            Log.d(TAG, "MediaScanner scanned uri: $uri")
+        }
+
+        return outputPath.absolutePath
     }
 
-    // Check if the authority of the URI is for downloads documents
-    private fun isDownloadsDocument(uri: Uri): Boolean {
-        return "com.android.providers.downloads.documents" == uri.authority
-    }
-
-    // Check if the authority of the URI is for media documents
-    private fun isMediaDocument(uri: Uri): Boolean {
-        return "com.android.providers.media.documents" == uri.authority
+    // Check if external storage is writable
+    private fun isExternalStorageWritable(): Boolean {
+        val state = Environment.getExternalStorageState()
+        return Environment.MEDIA_MOUNTED == state
     }
 
     // Get the data column for a given URI
