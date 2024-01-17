@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "ImageToVideoDemo"
 include(":app")
+include(":imagetovideo")
